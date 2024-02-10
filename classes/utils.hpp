@@ -5,6 +5,11 @@
 #include <sstream>
 #include <iomanip>
 #include <iostream>
+#include <functional>
+#include <mutex>
+
+#define _CAT(a,b) a##b
+#define CAT(a,b) _CAT(a,b)
 
 static std::string formatted(int64_t nanoseconds) {
    std::stringstream ss;
@@ -39,3 +44,20 @@ int main() { return timed_func(&main_impl); } \
 int main_impl
 
 #define TIME_IT(NAME, FUNC) timed_func(NAME, FUNC)
+
+template <typename MUT>
+struct _lock_iter_ {
+   explicit _lock_iter_(MUT& mutex) : lock(mutex) {}
+   _lock_iter_(const _lock_iter_&) = delete;
+   _lock_iter_(_lock_iter_&&) = delete;
+   _lock_iter_& operator=(const _lock_iter_&) = delete;
+   _lock_iter_& operator=(_lock_iter_&&) = delete;
+   [[nodiscard]] bool done() const { return itered; }
+   void set_done() { itered = true; }
+private:
+   std::unique_lock<MUT> lock;
+   bool itered = false;
+};
+
+#define synced_on(MUTEX) for (_lock_iter_ _iter_(MUTEX); !_iter_.done(); _iter_.set_done())
+#define synced static std::mutex CAT(_tex_, __LINE__); synced_on(CAT(_tex_, __LINE__))
